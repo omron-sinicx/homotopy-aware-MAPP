@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.16)
+project(Homotopy_for_MAPP)
+
+add_compile_options(-O3 -std=c++17 -Wfatal-errors)
+find_package(yaml-cpp 0.6.0 REQUIRED)
+find_package(Eigen3 3.3 REQUIRED )
+find_package(g2o 1.0.0 REQUIRED )
+include_directories( ${EIGEN3_INCLUDE_DIR} )
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
+include_directories(${g2o_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+
+add_library(braid src/braid.cpp)
+add_library(AnonymousBhattacharya src/AnonymousBhattacharya.cpp)
+add_library(PP src/prioritized_planning.cpp)
+add_executable(PP_on_grid src/PP_on_grid.cpp)
+add_executable(PP_with_various_priority src/PP_with_various_priority.cpp)
+add_executable(optimize_plans src/optimize_plans.cpp src/optimizer.cpp)
+add_executable(count_braids src/count_braids.cpp)
+
+target_link_libraries(AnonymousBhattacharya braid)
+target_link_libraries(PP AnonymousBhattacharya)
+target_link_libraries(PP_on_grid PP)
+target_link_libraries(PP_with_various_priority PP)
+target_link_libraries(optimize_plans braid yaml-cpp g2o_stuff g2o_core glog)
+target_link_libraries(count_braids braid)

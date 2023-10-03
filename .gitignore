@@ -1,0 +1,7 @@
+build*
+*~
+*.pt
+*.pdf
+events.*
+#*#
+__pycache__

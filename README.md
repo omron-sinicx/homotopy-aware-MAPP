@@ -1,4 +1,9 @@
-# Required Library
+# Homotopy-Aware Multi-Agent Path Planning in Plane
+This is a repository for [the following paper](https://arxiv.org/abs/2310.01945):
+- Kazumi Kasaura. 2023. “Homotopy-Aware Multi-Agent Path Planning in Plane.”
+
+
+## Required Library
 
 - [yamp-cpp](https://github.com/jbeder/yaml-cpp) 0.6.0
 - [Eigen3](https://eigen.tuxfamily.org/index.php) 3.3
@@ -6,7 +11,7 @@
 
 You can use [Dockerfile](Dockerfile) to build an environment.
 
-# Build
+## Build
 ```
 mkdir build
 cd build
@@ -15,23 +20,23 @@ make
 ```
 The following commands are to be run on the build folder.
 
-# Experiments
+## Experiments
 
-## Evaluation of Runtime
+### Evaluation of Runtime
 
-### Generate instances
+#### Generate instances
 ```
 mkdir grid_instances
 bash ../script/generate_grid_instances.sh 29 29 40 10
 ```
 
-### Solve
+#### Solve
 ```
 mkdir logs
 bash ../script/record_logs.sh 29 29 40 10 100
 ```
 
-### Plot results
+#### Plot results
 
 ```
 python3 ../script/show_makespan.py
@@ -39,14 +44,14 @@ python3 ../script/show_lengths.py
 python3 ../script/show_runtimes.py
 ```
 
-## Optimization Experiment
+### Optimization Experiment
 
-### Generate instances
+#### Generate instances
 ```
 bash ../script/generate_grid_instances.sh 14 14 10 100
 ```
 
-### Solve
+#### Solve
 
 ```
 mkdir PP_results
@@ -58,7 +63,7 @@ bash ../script/solve_by_PPvP.sh 14 14 10 100 100
 Although this repository does not contain any optimal MAPF solver for the Optimal One baseline,
 results of such a solver must be stored in a folder named `CBS_results` for the following steps.
 
-### Optimization
+#### Optimization
 
 ```
 mkdir PP_opt_results
@@ -67,14 +72,28 @@ mkdir CBS_opt_results
 bash ../script/optimize_PP_and_CBS.sh 14 14 10 100 100
 ```
 
-### Plot results
+#### Plot results
 
 ```
 python3 ../script/show_results.py
 ```
 
-### Show histogram
+#### Show histogram
 ```
 python3 ../script/count_braids.py > braid_counts.txt
 python3 ../script/show_histogram.py
+```
+## License
+This software is released under the MIT License, see [LICENSE](LICENSE).
+
+## Citation
+```
+@misc{kasaura2023homotopyaware,
+      title={Homotopy-Aware Multi-Agent Path Planning in Plane}, 
+      author={Kazumi Kasaura},
+      year={2023},
+      eprint={2310.01945},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA}
+}
 ```

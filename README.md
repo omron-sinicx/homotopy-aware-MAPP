@@ -8,6 +8,7 @@ This is a repository for [the following paper](https://arxiv.org/abs/2310.01945)
 - [yamp-cpp](https://github.com/jbeder/yaml-cpp) 0.6.0
 - [Eigen3](https://eigen.tuxfamily.org/index.php) 3.3
 - [g2o](https://github.com/RainerKuemmerle/g2o) 1.0.0
+- [gmp](https://gmplib.org/) 6.1.2
 
 You can use [Dockerfile](Dockerfile) to build an environment.
 

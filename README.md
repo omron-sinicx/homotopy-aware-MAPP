@@ -100,10 +100,10 @@ This software is released under the MIT License, see [LICENSE](LICENSE).
 
 ## Citation
 ```
-@misc{kasaura2023homotopyaware,
+@misc{kasaura2024homotopyaware,
       title={Homotopy-Aware Multi-Agent Path Planning in Plane}, 
       author={Kazumi Kasaura},
-      year={2023},
+      year={2024},
       eprint={2310.01945},
       archivePrefix={arXiv},
       primaryClass={cs.MA}

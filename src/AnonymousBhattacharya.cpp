@@ -1,8 +1,8 @@
 #include "AnonymousBhattacharya.hpp"
 
 void AnonymousBhattacharya::inner_calc_next_braid(
-    Braid &current_braid, const int i, const int target,
-    std::vector<int> &next_pos) const {
+    VirtualBraidPtr &current_braid, const int i, const int target,
+    std::vector<int> &next_pos) {
   // return the braid after agent i move to target
 
   int start = next_pos[i];
@@ -17,15 +17,16 @@ void AnonymousBhattacharya::inner_calc_next_braid(
     std::swap(next_pos[dir ? j - 1 : j + 1], next_pos[j]);
     bool ccw =
         calc_ccw(coordinates[start], coordinates[pos_j], coordinates[target]);
-    current_braid.add(dir ? j - 1 : j, ccw);
+    current_braid->add(dir ? j - 1 : j, ccw);
+    add_count++;
   }
 }
 
-Braid AnonymousBhattacharya::calc_next_braid(const Braid &current_braid,
-                                             const int i, const int target,
-                                             std::vector<int> &next_pos) const {
-  Braid new_braid = current_braid;
+/*VirtualBraidPtr AnonymousBhattacharya::calc_next_braid(const VirtualBraidPtr
+  &current_braid, const int i, const int target, std::vector<int> &next_pos)
+  const { VirtualBraidPtr new_braid = std::make_unique(*current_braid);
   inner_calc_next_braid(new_braid, i, target, next_pos);
-  new_braid.reduce_fully();
+  new_braid.post_process();
   return new_braid;
-}
+  return current_braid;
+  }*/

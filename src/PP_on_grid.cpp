@@ -1,10 +1,16 @@
 #include "prioritized_planning.hpp"
 
 int main(int argc, char **argv) {
-  int n, m, k, want = std::stoi(argv[1]);
+  int n, m, k, want = std::stoi(argv[1]), braid_type = 0, time_limit = 0;
   std::string log_filename = "";
   if (argc > 2) {
-    log_filename = std::string(argv[2]);
+    braid_type = std::stoi(argv[2]);
+    if (argc > 3) {
+      log_filename = std::string(argv[3]);
+      if(argc > 4){
+	time_limit = std::stoi(argv[4]);
+      }
+    }
   }
   scanf("%d%d%d", &n, &m, &k);
   std::vector<int> x0(k), y0(k), x1(k), y1(k);
@@ -48,7 +54,11 @@ int main(int argc, char **argv) {
     search.goals[i] = m * x1[i] + y1[i];
   }
   search.want = want;
-  auto plans = search.search(log_filename);
+  search.braid_type = braid_type;
+  auto plans = search.search(log_filename, time_limit);
+  if(plans[0].routes.size() < k){
+    return 0;
+  }
   printf("%d %d %d %d\n", n, m, k, (int)plans.size());
   for (auto &plan : plans) {
     auto &routes = plan.routes;
@@ -69,7 +79,7 @@ int main(int argc, char **argv) {
       }
       putchar('\n');
     }
-    braid.print();
+    braid->print();
   }
   return 0;
 }

@@ -1,18 +1,24 @@
 #include "AnonymousBhattacharya.hpp"
 #include <chrono>
+#include <memory>
 
 class PrioritizedPlanning : public AnonymousBhattacharya {
 public:
+  int braid_type = 0;
+  VirtualBraidPtr get_initial_braid(const int N = 0) const;
+  VirtualBraidPtr get_braid_copy(const VirtualBraidPtr &b) const;
+
   struct Plan {
     int cost;
     std::vector<std::vector<int>> routes;
     int makespan;
-    Braid braid;
+    VirtualBraidPtr braid;
   };
 
   std::vector<std::vector<int>> edges;
   std::vector<int> starts, goals;
   int want;
+  int count_closed_nodes = 0, count_all_nodes = 0;
 
   void reorder(std::vector<int> &order, std::vector<int> &rev_order,
                const int target, const int i,
@@ -40,35 +46,12 @@ public:
   }
 
   std::vector<Plan> single_search(const std::vector<Plan> plans,
-                                  const int agent_id) const;
+                                  const int agent_id);
 
   static int duration_to_int(const std::chrono::duration<double> &duration) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration)
         .count();
   }
 
-  std::vector<Plan> search(const std::string &log_filename = "") const {
-    std::vector<Plan> plans(1);
-    plans[0].routes = std::vector<std::vector<int>>(0);
-    plans[0].cost = 0;
-    plans[0].makespan = 0;
-    plans[0].braid = Braid(0);
-
-    FILE *log_file = NULL;
-    if(log_filename != ""){
-      log_file = fopen(log_filename.c_str(), "w");
-    }
-    auto start_time = std::chrono::system_clock::now();
-    for (int i = 0; i < noa; i++) {
-      plans = single_search(plans, i);
-      if(log_file != NULL){
-	int runtime = duration_to_int(std::chrono::system_clock::now() - start_time);
-	fprintf(log_file, "%d %d %d\n", runtime, (int)plans[0].braid.word.size(), (int)plans[0].makespan);
-      }
-    }
-    if (log_file != NULL) {
-      fclose(log_file);
-    }
-    return plans;
-  }
+  std::vector<Plan> search(const std::string &log_filename = "", const int time_limit = 0);
 };

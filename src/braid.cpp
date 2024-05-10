@@ -2,6 +2,32 @@
 #include <algorithm>
 #include <cassert>
 
+bool Braid::operator<(const VirtualBraid &_b) const {
+  auto b = dynamic_cast<const Braid &>(_b);
+  if (sign != b.sign)
+    return sign < b.sign;
+  if (main_i != b.main_i)
+    return sign ^ (main_i < b.main_i);
+  Braid diff;
+  diff.N = N;
+  diff.word.resize(word.size() + b.word.size());
+  for (int i = 0; i < word.size(); i++) {
+    auto w = word[word.size() - i - 1];
+    diff.word[i] = std::make_pair(w.first, !w.second);
+  }
+  std::copy(b.word.begin(), b.word.end(), diff.word.begin() + word.size());
+  diff.reduce_fully();
+  return diff.is_positive();
+}
+
+Braid::Braid(const VirtualBraid &_b) {
+  auto b = dynamic_cast<const Braid &>(_b);
+  N = b.N;
+  sign = b.sign;
+  main_i = b.main_i;
+  word = b.word;
+}
+
 void Braid::reduce_freely() {
   int resize = 0;
   for (int i = 0; i < word.size(); i++) {

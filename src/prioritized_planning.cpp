@@ -1,20 +1,34 @@
 #include "prioritized_planning.hpp"
+#include "braid.hpp"
+#include "dynnikov.hpp"
 #include <map>
 #include <numeric>
 #include <queue>
 #include <set>
+
+VirtualBraidPtr PrioritizedPlanning::get_initial_braid(const int N) const {
+  return braid_type == 0 ? VirtualBraidPtr(new Braid(N))
+                         : VirtualBraidPtr(new Dynnikov(N));
+}
+
+VirtualBraidPtr
+PrioritizedPlanning::get_braid_copy(const VirtualBraidPtr &b) const {
+  return braid_type == 0 ? VirtualBraidPtr(new Braid(*b))
+                         : VirtualBraidPtr(new Dynnikov(*b));
+}
+
 std::vector<PrioritizedPlanning::Plan>
 PrioritizedPlanning::single_search(const std::vector<Plan> plans,
-                                   const int agent_id) const {
+                                   const int agent_id) {
 
   const int INF = 1000000000;
 
   struct Configure {
     int pos, time;
-    Braid braid;
+    VirtualBraidPtr braid;
     int base_plan_id;
     Configure() {}
-    Configure(const int _pos, const int _time, const Braid _braid,
+    Configure(const int _pos, const int _time, const VirtualBraidPtr _braid,
               const int _base_plan_id)
         : pos(_pos), time(_time), braid(_braid), base_plan_id(_base_plan_id) {}
     bool operator<(const Configure &conf) const {
@@ -25,7 +39,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
       } else if (base_plan_id != conf.base_plan_id) {
         return base_plan_id < conf.base_plan_id;
       }
-      return braid < conf.braid;
+      return *braid < *conf.braid;
     }
   };
   struct Node {
@@ -124,7 +138,8 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     }
 
     Node node;
-    node.conf = Configure(start, 0, Braid(agent_id + 1), base_plan_id);
+    node.conf =
+        Configure(start, 0, get_initial_braid(agent_id + 1), base_plan_id);
     node.order = start_order;
     node.rev_order = start_rev_order;
     node.pos = start_pos;
@@ -150,6 +165,8 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
   // std::vector<std::vector<int>> braid_count(coordinates.size(),
   // std::vector<int>(max_height,0));
 
+  count_closed_nodes = 0;
+  
   while (!Q.empty() && new_plans.size() < number_of_plans) {
     QPair qpair = Q.top();
     Q.pop();
@@ -157,8 +174,10 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     if (!nodes[id].open)
       continue;
     nodes[id].open = false;
+    count_closed_nodes++;
 
     Node node = nodes[id];
+    int node_dist = node.dist;
     Configure &conf = node.conf;
     int t = conf.time;
 
@@ -183,7 +202,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
       std::reverse(route.begin(), route.end());
       new_plan.routes = plan.routes;
       new_plan.routes.push_back(route);
-      new_plan.cost = node.dist;
+      new_plan.cost = node_dist;
       new_plan.makespan = std::max(plan.makespan, (int)route.size());
       new_plan.braid = conf.braid;
       new_plans.push_back(new_plan);
@@ -192,8 +211,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     // move determined agents according to plan
     std::vector<int> order = node.order, rev_order = node.rev_order,
                      pos = node.pos;
-    Braid braid = conf.braid;
-    // std::vector<int> occupied = preoccupied;
+    VirtualBraidPtr braid = get_braid_copy(conf.braid);
     int s = pos[order[agent_id]];
     // bool collide = false;
     for (int i = 0; i < agent_id; i++) {
@@ -213,7 +231,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     }
     // if (collide)
     // continue;
-    braid.reduce_fully();
+    braid->post_process();
     int order_i = order[agent_id];
     for (int edge_id = 0; edge_id < edges[s].size(); edge_id++) {
       int target = edges[s][edge_id];
@@ -236,9 +254,11 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
         continue;
       }
       auto next_pos = pos;
-      new_conf.braid = calc_next_braid(braid, order_i, target, next_pos);
+      new_conf.braid = get_braid_copy(braid);
+      inner_calc_next_braid(new_conf.braid, order_i, target, next_pos);
+      new_conf.braid->post_process();
 
-      int new_dist = node.dist + (s == goal && target == goal &&
+      int new_dist = node_dist + (s == goal && target == goal &&
                                           t >= goal_time[conf.base_plan_id]
                                       ? 0
                                       : 1);
@@ -269,5 +289,47 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
       }
     }
   }
+  count_all_nodes = nodes.size();
   return new_plans;
+}
+
+std::vector<PrioritizedPlanning::Plan>
+PrioritizedPlanning::search(const std::string &log_filename, const int time_limit) {
+  std::vector<Plan> plans(1);
+  plans[0].routes = std::vector<std::vector<int>>(0);
+  plans[0].cost = 0;
+  plans[0].makespan = 0;
+  plans[0].braid = get_initial_braid(0);
+
+  FILE *log_file = NULL;
+  if (log_filename != "") {
+    log_file = fopen(log_filename.c_str(), "w");
+    assert(log_file != NULL);
+  }
+  auto start_time = std::chrono::system_clock::now();
+  for (int i = 0; i < noa; i++) {
+    plans = single_search(plans, i);
+    if (log_file != NULL) {
+      int runtime =
+          duration_to_int(std::chrono::system_clock::now() - start_time);
+        fprintf(log_file, "%d %d %d %llu %d %d ", runtime,
+                plans[0].makespan, plans[plans.size()-1].makespan, add_count, count_closed_nodes, count_all_nodes);
+      if (braid_type == 0) {
+        auto b = dynamic_cast<Braid &>(*plans[0].braid);
+        auto bl = dynamic_cast<Braid &>(*plans[plans.size()-1].braid);
+        fprintf(log_file, "%d %d\n", (int)b.word.size(),(int)bl.word.size());
+      } else {
+        auto b = dynamic_cast<Dynnikov &>(*plans[0].braid);
+        auto bl = dynamic_cast<Dynnikov &>(*plans[plans.size()-1].braid);
+        gmp_fprintf(log_file, "%Zd %Zd\n", b.get_max_abs_cd(), bl.get_max_abs_cd());
+      }
+      if(time_limit > 0 && runtime > time_limit){
+	break;
+      }
+    }
+  }
+  if (log_file != NULL) {
+    fclose(log_file);
+  }
+  return plans;
 }

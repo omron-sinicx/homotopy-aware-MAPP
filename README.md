@@ -39,9 +39,20 @@ bash ../script/record_logs.sh 29 29 40 10 100
 #### Plot results
 
 ```
-python3 ../script/show_makespan.py
-python3 ../script/show_lengths.py
 python3 ../script/show_runtimes.py
+python3 ../script/show_maxcd.py
+```
+
+### Plot coordinates for random braids
+
+```
+mkdir cd_values
+./dynnikov_count 3 30 100 100 > cd_values/3.txt
+./dynnikov_count 5 50 100 100 > cd_values/5.txt
+./dynnikov_count 10 100 100 100 > cd_values/10.txt
+./dynnikov_count 100 1000 100 100 > cd_values/100.txt
+./dynnikov_count 1000 10000 100 100 > cd_values/1000.txt
+python3 ../script/show_cd_values.py
 ```
 
 ### Optimization Experiment

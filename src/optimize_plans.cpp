@@ -36,14 +36,12 @@ int main(int argc, char **argv) {
   auto config = YAML::LoadFile(config_file_path);
   TrajectoryOptimizer optimizer(config, number_of_agents);
   bool output_plan = config["output_plan"].as<bool>();
-  int number_of_moves =
-      config["number_of_moves"] ? config["number_of_moves"].as<int>() : 0;
   if (output_plan) {
     printf("%d %d %d %d\n", width, height, number_of_agents,
-           number_of_plans * (number_of_moves + 1));
+           number_of_plans);
   } else {
     printf("%d %d\n", number_of_agents,
-           number_of_plans * (number_of_moves + 1));
+           number_of_plans);
   }
   std::default_random_engine engine(0);
   double move_distance =
@@ -72,7 +70,7 @@ int main(int argc, char **argv) {
       current_goals[i] = plan[i][makespan];
     }
 
-    if (!output_plan && (T == 0 || number_of_moves > 0)) {
+    if (!output_plan && T == 0) {
       for (int i = 0; i < number_of_agents; i++) {
         printf("%lf %lf ", plan[i][0].x(), plan[i][0].y());
       }
@@ -96,64 +94,13 @@ int main(int argc, char **argv) {
         putchar('\n');
       }
     }
-    int l;
-    scanf("%d", &l);
-    Braid b;
-    b.N = number_of_agents;
-    for (int t = 0; t < l; t++) {
-      int i;
-      char s[2];
-      scanf("%d %s", &i, s);
-      b.add(i, s[0] == '+');
-    }
-    b.reduce_fully();
-    b.print();
-    Braid plan_b = calculate_braid(optimized_plan);
-    plan_b.reduce_fully();
-    // assert(!(b < plan_b || plan_b < b));
+    while ((c = getchar()) != '\n')
+      ;
+    while ((c = getchar()) != '\n')
+      putchar(c);
+    putchar('\n');
     if (!output_plan) {
       printf("%lf\n", cost);
-    }
-    for (int tt = 0; tt < number_of_moves; tt++) {
-      for (int i = 0; i < number_of_agents; i++) {
-        // move start and goal current locations
-        current_starts[i].x() += dist(engine);
-        current_starts[i].y() += dist(engine);
-        current_goals[i].x() += dist(engine);
-        current_goals[i].y() += dist(engine);
-      }
-      optimizer.move_starts_and_goals(current_starts, current_goals);
-      double cost = optimizer.get_cost();
-      auto optimized_plan = optimizer.getPlan();
-      double delta = optimizer.getDelta();
-      fprintf(stderr, "%d %d %lf\n", T, tt, cost);
-      if (output_plan) {
-        printf("%d %lf %lf\n", optimizer.number_of_way_points, delta, cost);
-        for (int t = 0; t <= optimizer.number_of_way_points; t++) {
-          for (int i = 0; i < number_of_agents; i++) {
-            printf("%lf %lf ", optimized_plan[i][t].x(),
-                   optimized_plan[i][t].y());
-          }
-          putchar('\n');
-        }
-      } else {
-        for (int i = 0; i < number_of_agents; i++) {
-          printf("%lf %lf ", optimized_plan[i][0].x(),
-                 optimized_plan[i][0].y());
-        }
-        putchar('\n');
-        for (int i = 0; i < number_of_agents; i++) {
-          printf("%lf %lf ",
-                 optimized_plan[i][optimizer.number_of_way_points].x(),
-                 optimized_plan[i][optimizer.number_of_way_points].y());
-        }
-        putchar('\n');
-      }
-      Braid b = calculate_braid(optimized_plan);
-      b.print();
-      if (!output_plan) {
-        printf("%lf\n", cost);
-      }
     }
   }
   return 0;

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "braid.hpp"
+#include "virtual_braid.hpp"
 #include <cassert>
 #include <cmath>
 
@@ -29,10 +29,11 @@ public:
   // problem instance
   int noa, nov;
   std::vector<Point> coordinates;
+  unsigned long long add_count = 0;
 
-  Braid calc_next_braid(const Braid &current_braid, const int i,
-                        const int target, std::vector<int> &next_pos) const;
-  void inner_calc_next_braid(Braid &current_braid, const int i,
-                             const int target,
-                             std::vector<int> &next_pos) const;
+  // VirtualBraidPtr calc_next_braid(const VirtualBraidPtr &current_braid, const
+  // int i,
+  //                      const int target, std::vector<int> &next_pos) const;
+  void inner_calc_next_braid(VirtualBraidPtr &current_braid, const int i,
+                             const int target, std::vector<int> &next_pos);
 };

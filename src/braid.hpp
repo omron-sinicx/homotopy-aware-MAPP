@@ -1,41 +1,28 @@
+#include "virtual_braid.hpp"
 #include <tuple>
 #include <vector>
 
-class Braid {
+class Braid : public VirtualBraid {
 public:
-  int N;
-  bool sign;
-  int main_i;
   Braid() {}
-  Braid(const int _N) : N(_N) {
+  Braid(const int _N) {
+    N = _N;
     sign = false;
     main_i = N;
   }
+  Braid(const VirtualBraid &_b);
+  void add(const int i, const bool sign) override;
+  bool operator<(const VirtualBraid &b) const override;
+  void post_process() override { reduce_fully(); }
+  bool sign;
+  int main_i;
   std::vector<std::pair<int, bool>> word;
   void reduce_freely();
   void reduce_fully();
-  void add(const int i, const bool sign);
   std::pair<int, bool> get_main() const;
   bool is_positive() const;
 
-  bool operator<(const Braid &b) const {
-    if (sign != b.sign)
-      return sign < b.sign;
-    if (main_i != b.main_i)
-      return sign ^ (main_i < b.main_i);
-    Braid diff;
-    diff.N = N;
-    diff.word.resize(word.size() + b.word.size());
-    for (int i = 0; i < word.size(); i++) {
-      auto w = word[word.size() - i - 1];
-      diff.word[i] = std::make_pair(w.first, !w.second);
-    }
-    std::copy(b.word.begin(), b.word.end(), diff.word.begin() + word.size());
-    diff.reduce_fully();
-    return diff.is_positive();
-  }
-
-  void print() const {
+  void print() const override {
     printf("%d ", (int)word.size());
     for (int i = 0; i < word.size(); i++) {
       printf("%d %c ", word[i].first, word[i].second ? '+' : '-');

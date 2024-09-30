@@ -1,62 +1,26 @@
 #include "prioritized_planning.hpp"
+#include <cstring>
+#include <queue>
 
 int main(int argc, char **argv) {
-  int n, m, k, want = std::stoi(argv[1]), braid_type = 0, time_limit = 0;
+  int n, m, want = std::stoi(argv[1]), braid_type = 1, time_limit = 0;
   std::string log_filename = "";
   if (argc > 2) {
     braid_type = std::stoi(argv[2]);
     if (argc > 3) {
       log_filename = std::string(argv[3]);
-      if(argc > 4){
-	time_limit = std::stoi(argv[4]);
-      }
-    }
-  }
-  scanf("%d%d%d", &n, &m, &k);
-  std::vector<int> x0(k), y0(k), x1(k), y1(k);
-  for (int i = 0; i < k; i++) {
-    scanf("%d%d%d%d", &x0[i], &y0[i], &x1[i], &y1[i]);
-  }
-  std::vector<std::vector<int>> e(n * m);
-  for (int x = 0; x < n; x++) {
-    for (int y = 0; y < m; y++) {
-      int id = m * x + y;
-      e[id].push_back(id);
-      if (0 < x) {
-        e[id].push_back(id - m);
-      }
-      if (x + 1 < n) {
-        e[id].push_back(id + m);
-      }
-      if (0 < y) {
-        e[id].push_back(id - 1);
-      }
-      if (y + 1 < m) {
-        e[id].push_back(id + 1);
+      if (argc > 4) {
+        time_limit = std::stoi(argv[4]);
       }
     }
   }
   PrioritizedPlanning search;
-  search.edges = e;
-  search.coordinates = std::vector<AnonymousBhattacharya::Point>(n * m);
-  for (int x = 0; x < n; x++) {
-    for (int y = 0; y < m; y++) {
-      int id = m * x + y;
-      search.coordinates[id].x = x;
-      search.coordinates[id].y = y;
-    }
-  }
-  search.noa = k;
-  search.starts = std::vector<int>(k);
-  search.goals = std::vector<int>(k);
-  for (int i = 0; i < k; i++) {
-    search.starts[i] = m * x0[i] + y0[i];
-    search.goals[i] = m * x1[i] + y1[i];
-  }
+  search.read_grid_map(n, m);
+  int k = search.noa;
   search.want = want;
-  search.braid_type = braid_type;
+  search.braid_type = (braid_type == 0 ? generator_type : dynnikov_type);
   auto plans = search.search(log_filename, time_limit);
-  if(plans[0].routes.size() < k){
+  if (plans[0].routes.size() < k) {
     return 0;
   }
   printf("%d %d %d %d\n", n, m, k, (int)plans.size());
@@ -67,15 +31,17 @@ int main(int argc, char **argv) {
     printf("%d %d\n", makespan, plan.cost);
     std::vector<int> curs = search.starts;
     for (int i = 0; i < k; i++) {
-      printf("%d %d ", curs[i] / m, curs[i] % m);
+      printf("%d %d ", search.coordinates[curs[i]].x,
+             search.coordinates[curs[i]].y);
     }
     putchar('\n');
     for (int s = 0; s < makespan; s++) {
       for (int i = 0; i < k; i++) {
         if (routes[i].size() > s) {
-          curs[i] = e[curs[i]][routes[i][s]];
+          curs[i] = search.edges[curs[i]][routes[i][s]];
         }
-        printf("%d %d ", curs[i] / m, curs[i] % m);
+        printf("%d %d ", search.coordinates[curs[i]].x,
+               search.coordinates[curs[i]].y);
       }
       putchar('\n');
     }

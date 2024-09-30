@@ -310,6 +310,81 @@ public:
   virtual bool write(std::ostream &os) const { return true; }
 };
 
+class WayPointConstraint
+    : public g2o::BaseUnaryEdge<1, double, WayPointVertex> {
+public:
+  const std::shared_ptr<std::vector<std::vector<Eigen::Vector2d>>> boundaries;
+  const double agent_radius;
+  WayPointConstraint(
+      WayPointVertex *point, double _agent_radius,
+      const std::shared_ptr<std::vector<std::vector<Eigen::Vector2d>>>
+          &_boundaries,
+      const double coefficient)
+      : g2o::BaseUnaryEdge<1, double, WayPointVertex>(),
+        boundaries(_boundaries), agent_radius(_agent_radius) {
+    _vertices[0] = point;
+    _information[0] = coefficient;
+  }
+  void setCoefficient(const double coefficient) {
+    _information[0] = coefficient;
+  }
+  void computeError() {
+    Eigen::Vector2d point =
+        static_cast<const WayPointVertex *>(_vertices[0])->estimate();
+    _error[0] = 0.;
+    for (auto &boundary : *boundaries) {
+      double distance = 2. * agent_radius;
+      for (int i = 0; i < boundary.size(); i++) {
+        Eigen::Vector2d point_a = boundary[i],
+                        point_b = boundary[(i + 1) % boundary.size()];
+        distance = std::min(distance, (point - point_a).norm());
+        double length = (point_b - point_a).norm(),
+               ip = (point_b - point_a).dot(point - point_a) / length;
+        if (0 < ip && ip < length) {
+          Eigen::Vector2d foot = point_a + (point_b - point_a) / length * ip;
+          distance = std::min(distance, (point - foot).norm());
+        }
+      }
+      _error[0] += distance < agent_radius
+                       ? 1. / (distance + EPS) - 1. / agent_radius
+                       : 0.;
+    }
+  }
+  void linearizeOplus() override {
+    Eigen::Vector2d point =
+        static_cast<const WayPointVertex *>(_vertices[0])->estimate();
+    std::get<0>(_jacobianOplus) = Eigen::MatrixXd::Zero(1, 2);
+    for (auto &boundary : *boundaries) {
+      double distance = 2. * agent_radius;
+      Eigen::Vector2d nearest;
+      for (int i = 0; i < boundary.size(); i++) {
+        Eigen::Vector2d point_a = boundary[i],
+                        point_b = boundary[(i + 1) % boundary.size()];
+        if (distance > (point - point_a).norm()) {
+          distance = (point - point_a).norm();
+          nearest = point_a;
+        }
+        double length = (point_b - point_a).norm(),
+               ip = (point_b - point_a).dot(point - point_a) / length;
+        if (0 < ip && ip < length) {
+          Eigen::Vector2d foot = point_a + (point_b - point_a) / length * ip;
+          if (distance > (point - foot).norm()) {
+            distance = (point - foot).norm();
+            nearest = foot;
+          }
+        }
+      }
+      if (distance < agent_radius) {
+        double dedd = -std::pow(distance + EPS, -2);
+        std::get<0>(_jacobianOplus) +=
+            (dedd * (point - nearest) / (distance + EPS)).transpose();
+      }
+    }
+  }
+  virtual bool read(std::istream &is) { return true; }
+  virtual bool write(std::ostream &os) const { return true; }
+};
+
 class OurPreIteration : public g2o::HyperGraphAction {
 public:
   const int pre_iteration, growth_iteration;
@@ -424,6 +499,7 @@ public:
   std::vector<PathCostConstraintMaxVelocity *> v_constraints;
   std::vector<PathCostConstraintMaxAcceleration *> a_constraints;
   std::vector<CollisionConstraint *> c_constraints;
+  std::vector<WayPointConstraint *> w_constraints;
 
   int pre_iteration = 0, growth_iteration = 0;
   double pre_growth_rate = 1., growth_rate = 1., initial_lambda = 0.;
@@ -433,7 +509,10 @@ public:
   double way_point_target_coefficient = 0.;
   std::vector<WayPointTargetConstraint *> start_constraints, goal_constraints;
 
-  TrajectoryOptimizer(const YAML::Node &config, const int number_of_agents) {
+  TrajectoryOptimizer(
+      const YAML::Node &config, const int number_of_agents,
+      const std::shared_ptr<std::vector<std::vector<Eigen::Vector2d>>>
+          &boundaries) {
     number_of_way_points = config["number_of_way_points"].as<int>();
     this->number_of_agents = number_of_agents;
     if (config["max_iteration"]) {
@@ -442,10 +521,10 @@ public:
 
     typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>> ABlockSolver;
     typedef g2o::LinearSolverEigen<ABlockSolver::PoseMatrixType> ALinearSolver;
-    auto linearSolver = g2o::make_unique<ALinearSolver>();
+    auto linearSolver = std::make_unique<ALinearSolver>();
     linearSolver->setBlockOrdering(false);
     solver = new g2o::OptimizationAlgorithmLevenberg(
-        g2o::make_unique<ABlockSolver>(std::move(linearSolver)));
+        std::make_unique<ABlockSolver>(std::move(linearSolver)));
     optimizer.setAlgorithm(solver);
     optimizer.setVerbose(config["verbose"] ? config["verbose"].as<bool>()
                                            : false);
@@ -457,6 +536,7 @@ public:
     v_constraints.clear();
     a_constraints.clear();
     c_constraints.clear();
+    w_constraints.clear();
 
     int vertex_id = 0;
     delta = new ParameterVertex;
@@ -510,6 +590,8 @@ public:
     }
     */
 
+    collision_cost_const = config["collision_cost_const"].as<double>();
+
     for (int agent = 0; agent < number_of_agents; agent++) {
       auto &path = paths[agent];
       // int path_size = !consider_acceleration ? number_of_way_points + 1
@@ -519,6 +601,11 @@ public:
         path[i] = new WayPointVertex;
         path[i]->setId(vertex_id++);
         optimizer.addVertex(path[i]);
+        auto w_constraint =
+            new WayPointConstraint(path[i], agent_radius, boundaries,
+                                   collision_cost_const / number_of_way_points);
+        optimizer.addEdge(w_constraint);
+        w_constraints.push_back(w_constraint);
       }
       // if (!consider_acceleration) {
       path[0]->setFixed(true);
@@ -584,12 +671,12 @@ public:
         optimizer.addEdge(goal_constraint);
       }
     }
-    collision_cost_const = config["collision_cost_const"].as<double>();
     for (int i = 0; i < number_of_agents; i++) {
       for (int j = i + 1; j < number_of_agents; j++) {
         for (int t = 1; t < number_of_way_points; t++) {
           auto collision_constraint = new CollisionConstraint(
-              paths[i][t], paths[j][t], agent_radius, collision_cost_const);
+              paths[i][t], paths[j][t], agent_radius,
+              collision_cost_const / number_of_way_points);
           optimizer.addEdge(collision_constraint);
           c_constraints.push_back(collision_constraint);
         }
@@ -646,6 +733,9 @@ public:
     for (auto &constraint : c_constraints) {
       constraint->setInformation(growth_rate * constraint->information());
     }
+    for (auto &constraint : w_constraints) {
+      constraint->setInformation(growth_rate * constraint->information());
+    }
   }
 
   void resetCoefficient() {
@@ -656,7 +746,10 @@ public:
       constraint->setCoefficient(acceleration_cost_const);
     }
     for (auto &constraint : c_constraints) {
-      constraint->setCoefficient(collision_cost_const);
+      constraint->setCoefficient(collision_cost_const / number_of_way_points);
+    }
+    for (auto &constraint : w_constraints) {
+      constraint->setCoefficient(collision_cost_const / number_of_way_points);
     }
   }
 

@@ -7,14 +7,14 @@
 #include <set>
 
 VirtualBraidPtr PrioritizedPlanning::get_initial_braid(const int N) const {
-  return braid_type == 0 ? VirtualBraidPtr(new Braid(N))
-                         : VirtualBraidPtr(new Dynnikov(N));
+  return braid_type == generator_type ? VirtualBraidPtr(new Braid(N))
+                                      : VirtualBraidPtr(new Dynnikov(N));
 }
 
 VirtualBraidPtr
 PrioritizedPlanning::get_braid_copy(const VirtualBraidPtr &b) const {
-  return braid_type == 0 ? VirtualBraidPtr(new Braid(*b))
-                         : VirtualBraidPtr(new Dynnikov(*b));
+  return braid_type == generator_type ? VirtualBraidPtr(new Braid(*b))
+                                      : VirtualBraidPtr(new Dynnikov(*b));
 }
 
 std::vector<PrioritizedPlanning::Plan>
@@ -53,23 +53,54 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
   int start = starts[agent_id];
   int goal = goals[agent_id];
 
-  std::vector<int> start_order(agent_id + 1), start_rev_order(agent_id + 1),
-      start_pos(agent_id + 1);
+  int noo = obpts.size();
+  std::vector<int> combined_starts = obpts;
+  combined_starts.insert(combined_starts.end(), starts.begin(), starts.end());
+  std::vector<int> start_order(noo + agent_id + 1),
+      start_rev_order(noo + agent_id + 1), start_pos(noo + agent_id + 1);
   std::iota(start_rev_order.begin(), start_rev_order.end(), 0);
-  std::vector<Point> start_coordinates(agent_id + 1);
-  for (int i = 0; i <= agent_id; i++) {
-    start_coordinates[i] = coordinates[starts[i]];
+  std::vector<Point> start_coordinates(noo + agent_id + 1);
+  for (int i = 0; i <= noo + agent_id; i++) {
+    start_coordinates[i] = coordinates[combined_starts[i]];
   }
   std::sort(start_rev_order.begin(), start_rev_order.end(),
             [&start_coordinates](const int i, const int j) {
               return start_coordinates[i] < start_coordinates[j];
             });
-  for (int i = 0; i <= agent_id; i++) {
+  for (int i = 0; i <= noo + agent_id; i++) {
     start_order[start_rev_order[i]] = i;
   }
-  for (int i = 0; i <= agent_id; i++) {
-    start_pos[i] = starts[start_rev_order[i]];
+  for (int i = 0; i <= noo + agent_id; i++) {
+    start_pos[i] = combined_starts[start_rev_order[i]];
   }
+
+  /*
+  // compute max banned start index
+  int banned_start_index;
+  {
+    std::vector<int> min_index(edges.size(), starts.size()),
+  max_min_index(edges.size(), -1); for(int i = starts.size(); i > agent_id;
+  i--){ min_index[starts[i]] = i;
+    }
+    std::priority_queue<std::pair<int,int> > Q;
+    max_min_index[goal] = min_index[goal];
+    Q.push(std::make_pair(max_min_index[goal] , goal));
+    while(!Q.empty()){
+      auto p = Q.top();
+      Q.pop();
+      if(min_index[p.second] > p.first)
+        continue;
+      for(int j : edges[p.second]){
+        int md = std::min(p.first, min_index[j]);
+        if( md > max_min_index[j]){
+          Q.push(std::pair(md, j));
+          max_min_index[j] = md;
+        }
+      }
+    }
+    banned_start_index = max_min_index[start];
+  }
+  */
 
   std::vector<Node> nodes;
   using QPair = std::pair<std::pair<int, int>, int>;
@@ -83,7 +114,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     auto &plan = plans[base_plan_id];
 
     int height = plan.makespan + 2;
-    std::vector<std::vector<bool>> cells(coordinates.size(),
+    std::vector<std::vector<bool>> cells(edges.size(),
                                          std::vector<bool>(height, true));
     std::vector<int> cur = starts;
     cur.resize(agent_id);
@@ -106,10 +137,13 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
       for (int t = 0; t < height; t++) {
         cells[starts[i]][t] = false;
       }
+      if (starts[i] == goal) {
+        goal_time[base_plan_id] = height;
+      }
     }
 
     auto &dist = dist_to_go[base_plan_id];
-    dist = std::vector<std::vector<int>>(coordinates.size(),
+    dist = std::vector<std::vector<int>>(edges.size(),
                                          std::vector<int>(height, INF));
     std::queue<std::pair<int, int>> bfs;
     for (int t = goal_time[base_plan_id]; t < height; t++) {
@@ -137,9 +171,13 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
       }
     }
 
+    if (dist[start][0] == INF) {
+      continue;
+    }
+
     Node node;
-    node.conf =
-        Configure(start, 0, get_initial_braid(agent_id + 1), base_plan_id);
+    node.conf = Configure(start, 0, get_initial_braid(noo + agent_id + 1),
+                          base_plan_id);
     node.order = start_order;
     node.rev_order = start_rev_order;
     node.pos = start_pos;
@@ -154,6 +192,11 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     node_index[node.conf] = id;
   }
 
+  if (nodes.size() == 0) {
+    char message[100];
+    sprintf(message, "Path Planning Failed at Agent %d\n", agent_id);
+    throw std::runtime_error(std::string(message));
+  }
   std::vector<Plan> new_plans;
 
   int number_of_plans = want;
@@ -166,7 +209,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
   // std::vector<int>(max_height,0));
 
   count_closed_nodes = 0;
-  
+
   while (!Q.empty() && new_plans.size() < number_of_plans) {
     QPair qpair = Q.top();
     Q.pop();
@@ -212,14 +255,14 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     std::vector<int> order = node.order, rev_order = node.rev_order,
                      pos = node.pos;
     VirtualBraidPtr braid = get_braid_copy(conf.braid);
-    int s = pos[order[agent_id]];
+    int s = pos[order[noo + agent_id]];
     // bool collide = false;
     for (int i = 0; i < agent_id; i++) {
       // occupied.push_back(pos[order[i]]);
       if (plan.routes[i].size() <= t) {
         continue;
       }
-      int order_i = order[i], source = pos[order_i];
+      int order_i = order[noo + i], source = pos[order_i];
       int target = edges[source][plan.routes[i][t]];
       reorder(order, rev_order, target, order_i, pos);
       inner_calc_next_braid(braid, order_i, target, pos);
@@ -232,7 +275,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     // if (collide)
     // continue;
     braid->post_process();
-    int order_i = order[agent_id];
+    int order_i = order[noo + agent_id];
     for (int edge_id = 0; edge_id < edges[s].size(); edge_id++) {
       int target = edges[s][edge_id];
       /*bool collide = false;
@@ -294,16 +337,21 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
 }
 
 std::vector<PrioritizedPlanning::Plan>
-PrioritizedPlanning::search(const std::string &log_filename, const int time_limit) {
+PrioritizedPlanning::search(const std::string &log_filename,
+                            const int time_limit) {
   std::vector<Plan> plans(1);
   plans[0].routes = std::vector<std::vector<int>>(0);
   plans[0].cost = 0;
   plans[0].makespan = 0;
-  plans[0].braid = get_initial_braid(0);
+  plans[0].braid = get_initial_braid(obpts.size());
 
   FILE *log_file = NULL;
   if (log_filename != "") {
-    log_file = fopen(log_filename.c_str(), "w");
+    if (log_filename == std::string("stderr")) {
+      log_file = stderr;
+    } else {
+      log_file = fopen(log_filename.c_str(), "w");
+    }
     assert(log_file != NULL);
   }
   auto start_time = std::chrono::system_clock::now();
@@ -312,24 +360,152 @@ PrioritizedPlanning::search(const std::string &log_filename, const int time_limi
     if (log_file != NULL) {
       int runtime =
           duration_to_int(std::chrono::system_clock::now() - start_time);
-        fprintf(log_file, "%d %d %d %llu %d %d ", runtime,
-                plans[0].makespan, plans[plans.size()-1].makespan, add_count, count_closed_nodes, count_all_nodes);
-      if (braid_type == 0) {
+      fprintf(log_file, "%d %d %d %llu %d %d ", runtime, plans[0].makespan,
+              plans[plans.size() - 1].makespan, add_count, count_closed_nodes,
+              count_all_nodes);
+      if (braid_type == generator_type) {
         auto b = dynamic_cast<Braid &>(*plans[0].braid);
-        auto bl = dynamic_cast<Braid &>(*plans[plans.size()-1].braid);
-        fprintf(log_file, "%d %d\n", (int)b.word.size(),(int)bl.word.size());
+        auto bl = dynamic_cast<Braid &>(*plans[plans.size() - 1].braid);
+        fprintf(log_file, "%d %d\n", (int)b.word.size(), (int)bl.word.size());
       } else {
         auto b = dynamic_cast<Dynnikov &>(*plans[0].braid);
-        auto bl = dynamic_cast<Dynnikov &>(*plans[plans.size()-1].braid);
-        gmp_fprintf(log_file, "%Zd %Zd\n", b.get_max_abs_cd(), bl.get_max_abs_cd());
+        auto bl = dynamic_cast<Dynnikov &>(*plans[plans.size() - 1].braid);
+        gmp_fprintf(log_file, "%Zd %Zd\n", b.get_max_abs_cd(),
+                    bl.get_max_abs_cd());
       }
-      if(time_limit > 0 && runtime > time_limit){
-	break;
+      if (time_limit > 0 && runtime > time_limit) {
+        break;
       }
+      fflush(log_file);
     }
   }
   if (log_file != NULL) {
     fclose(log_file);
   }
   return plans;
+}
+
+const int dx[8] = {1, 1, 1, 0, 0, -1, -1, -1},
+          dy[8] = {1, 0, -1, 1, -1, 1, 0, -1};
+
+void PrioritizedPlanning::read_grid_map(int &n, int &m) {
+  std::vector<std::vector<bool>> map;
+  char map_type[100];
+  scanf("%s", map_type);
+  if (!strcmp(map_type, "empty")) {
+    scanf("%d%d", &n, &m);
+    map = std::vector<std::vector<bool>>(n, std::vector<bool>(m, true));
+  } else {
+    FILE *f = fopen(map_type, "r");
+    if (f == NULL) {
+      fprintf(stderr, "Invalid map file");
+      exit(1);
+    }
+    fscanf(f, "type octile\nheight %d\nwidth %d\nmap\n", &m, &n);
+    map = std::vector<std::vector<bool>>(n, std::vector<bool>(m));
+    for (int i = 0; i < m; i++) {
+      char s[1000];
+      fscanf(f, "%s", s);
+      for (int j = 0; j < n; j++) {
+        map[j][m - i - 1] = (s[j] == '.' || s[j] == 'G');
+      }
+    }
+  }
+  int nov = 0;
+  std::vector<int> ids(n * m);
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < m; j++) {
+      if (map[i][j]) {
+        ids[m * i + j] = nov++;
+      } else {
+        ids[m * i + j] = -1;
+      }
+    }
+  }
+  edges = std::vector<std::vector<int>>(nov);
+  for (int x = 0; x < n; x++) {
+    for (int y = 0; y < m; y++) {
+      int v = m * x + y, id = ids[v];
+      if (id == -1) {
+        continue;
+      }
+      edges[id].push_back(id);
+      if (0 < x && ids[v - m] != -1) {
+        edges[id].push_back(ids[v - m]);
+      }
+      if (x + 1 < n && ids[v + m] != -1) {
+        edges[id].push_back(ids[v + m]);
+      }
+      if (0 < y && ids[v - 1] != -1) {
+        edges[id].push_back(ids[v - 1]);
+      }
+      if (y + 1 < m && ids[v + 1] != -1) {
+        edges[id].push_back(ids[v + 1]);
+      }
+    }
+  }
+  coordinates = std::vector<AnonymousBhattacharya::Point>(n * m);
+  for (int x = 0; x < n; x++) {
+    for (int y = 0; y < m; y++) {
+      int id = ids[m * x + y];
+      if (id != -1) {
+        coordinates[id].x = x;
+        coordinates[id].y = y;
+      }
+    }
+  }
+  obpts = std::vector<int>();
+  std::vector<std::vector<bool>> visit(n, std::vector<bool>(m, false));
+  for (int x = 0; x < n; x++) {
+    for (int y = 0; y < m; y++) {
+      if (map[x][y] or visit[x][y]) {
+        continue;
+      }
+      std::queue<std::pair<int, int>> Q;
+      Q.push(std::make_pair(x, y));
+      visit[x][y] = true;
+      bool outer = false;
+      while (!Q.empty()) {
+        auto p = Q.front();
+        Q.pop();
+        if (p.first == 0 || p.first == n - 1 || p.second == 0 ||
+            p.second == m - 1) {
+          outer = true;
+        }
+        for (int v = 0; v < 8; v++) {
+          int nx = p.first + dx[v], ny = p.second + dy[v];
+          if (0 <= nx && nx < n && 0 <= ny && ny < m && !map[nx][ny] &&
+              !visit[nx][ny]) {
+            Q.push(std::make_pair(nx, ny));
+            visit[nx][ny] = true;
+          }
+        }
+      }
+      if (!outer) {
+        obpts.push_back(coordinates.size());
+        coordinates.push_back(AnonymousBhattacharya::Point(x, y));
+      }
+    }
+  }
+  int k;
+  scanf("%d", &k);
+  std::vector<int> x0(k), y0(k), x1(k), y1(k);
+  for (int i = 0; i < k; i++) {
+    scanf("%d%d%d%d", &x0[i], &y0[i], &x1[i], &y1[i]);
+  }
+  noa = k;
+  starts = std::vector<int>(k);
+  goals = std::vector<int>(k);
+  for (int i = 0; i < k; i++) {
+    starts[i] = ids[m * x0[i] + y0[i]];
+    if (starts[i] == -1) {
+      fprintf(stderr, "Invalid start for agent %d\n", i);
+      exit(1);
+    }
+    goals[i] = ids[m * x1[i] + y1[i]];
+    if (goals[i] == -1) {
+      fprintf(stderr, "Invalid goal for agent %d\n", i);
+      exit(1);
+    }
+  }
 }

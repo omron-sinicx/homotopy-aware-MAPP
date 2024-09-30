@@ -51,7 +51,7 @@ RUN apt-get install -y pkg-config \
     libglm-dev \
     libao-dev \
     libmpg123-dev
-RUN git clone https://github.com/glfw/glfw.git
+RUN git clone https://github.com/glfw/glfw.git -b 3.3-stable
 RUN apt-get install -y libxinerama-dev \
     libxcursor-dev \
     libxi-dev
@@ -82,7 +82,8 @@ RUN python3 -m pip install \
     tensorboard==2.12.0
 
 # install gmp
-RUN apt-get install m4 libgmpxx4ldbl
+RUN apt-get update
+RUN apt-get install -y m4 libgmpxx4ldbl
 RUN wget https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz && tar -xvf gmp-6.1.2.tar.xz
 RUN cd gmp-6.1.2 && ./configure --enable-cxx && make && make check && make install && cd ..
 RUN rm gmp-6.1.2.tar.xz && rm -rf gmp-6.1.2

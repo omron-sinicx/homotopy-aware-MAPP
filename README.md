@@ -21,6 +21,11 @@ make
 ```
 The following commands are to be run on the build folder.
 
+```
+./PP_on_grid H < input_file
+```
+where `H` is the number of required solutions.
+
 ## Experiments
 
 ### Evaluation of Runtime

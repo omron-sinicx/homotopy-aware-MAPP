@@ -20,6 +20,9 @@ public:
     }
 
     bool operator>(const Point &p2) const { return p2 < *this; }
+
+    Point() {}
+    Point(int _x, int _y) { x = _x, y = _y; }
   };
 
   bool calc_ccw(const Point &p0, const Point &p1, const Point &p2) const {

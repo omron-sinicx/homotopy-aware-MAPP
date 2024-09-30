@@ -2,7 +2,7 @@ number_of_way_points: 100
 agent_radius: 0.5
 verbose: false
 
-collision_cost_const: 10000.
+collision_cost_const: 1000000.
 smooth_acceleration_cost_const : 1.0
 
 variable_delta: false

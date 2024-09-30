@@ -12,7 +12,8 @@ mpz_class get_max_cd(const Dynnikov &b) {
 }
 
 int main(int argc, char **argv) {
-  int n = std::stoi(argv[1]), L = std::stoi(argv[2]), T = std::stoi(argv[3]), I = std::stoi(argv[4]);
+  int n = std::stoi(argv[1]), L = std::stoi(argv[2]), T = std::stoi(argv[3]),
+      I = std::stoi(argv[4]);
   for (int t = 0; t < T; t++) {
     Dynnikov b(n);
     for (int l = 1; l <= L * I; l++) {
@@ -20,8 +21,8 @@ int main(int argc, char **argv) {
       bool sign = rand() % 2;
       b.add(i, sign);
       if (l % L == 0) {
-	auto max_cd = get_max_cd(b);
-	gmp_printf("%.Zd\n", max_cd);
+        auto max_cd = get_max_cd(b);
+        gmp_printf("%.Zd\n", max_cd);
       }
     }
   }

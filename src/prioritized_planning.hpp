@@ -2,9 +2,11 @@
 #include <chrono>
 #include <memory>
 
+enum braid_types { generator_type, dynnikov_type };
+
 class PrioritizedPlanning : public AnonymousBhattacharya {
 public:
-  int braid_type = 0;
+  braid_types braid_type = dynnikov_type;
   VirtualBraidPtr get_initial_braid(const int N = 0) const;
   VirtualBraidPtr get_braid_copy(const VirtualBraidPtr &b) const;
 
@@ -16,7 +18,7 @@ public:
   };
 
   std::vector<std::vector<int>> edges;
-  std::vector<int> starts, goals;
+  std::vector<int> starts, goals, obpts;
   int want;
   int count_closed_nodes = 0, count_all_nodes = 0;
 
@@ -53,5 +55,7 @@ public:
         .count();
   }
 
-  std::vector<Plan> search(const std::string &log_filename = "", const int time_limit = 0);
+  std::vector<Plan> search(const std::string &log_filename = "",
+                           const int time_limit = 0);
+  void read_grid_map(int &n, int &m);
 };

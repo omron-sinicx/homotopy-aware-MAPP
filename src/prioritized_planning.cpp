@@ -74,34 +74,6 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
     start_pos[i] = combined_starts[start_rev_order[i]];
   }
 
-  /*
-  // compute max banned start index
-  int banned_start_index;
-  {
-    std::vector<int> min_index(edges.size(), starts.size()),
-  max_min_index(edges.size(), -1); for(int i = starts.size(); i > agent_id;
-  i--){ min_index[starts[i]] = i;
-    }
-    std::priority_queue<std::pair<int,int> > Q;
-    max_min_index[goal] = min_index[goal];
-    Q.push(std::make_pair(max_min_index[goal] , goal));
-    while(!Q.empty()){
-      auto p = Q.top();
-      Q.pop();
-      if(min_index[p.second] > p.first)
-        continue;
-      for(int j : edges[p.second]){
-        int md = std::min(p.first, min_index[j]);
-        if( md > max_min_index[j]){
-          Q.push(std::pair(md, j));
-          max_min_index[j] = md;
-        }
-      }
-    }
-    banned_start_index = max_min_index[start];
-  }
-  */
-
   std::vector<Node> nodes;
   using QPair = std::pair<std::pair<int, int>, int>;
   std::priority_queue<QPair, std::vector<QPair>, std::greater<QPair>> Q;
@@ -110,37 +82,51 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
 
   std::vector<std::vector<std::vector<int>>> dist_to_go(plans.size());
 
+  std::vector<std::vector<std::vector<bool>>> plan_cells(plans.size());
+  std::vector<std::vector<std::vector<std::vector<bool>>>> plan_edge_cells(plans.size());
+  
   for (int base_plan_id = 0; base_plan_id < plans.size(); base_plan_id++) {
     auto &plan = plans[base_plan_id];
 
-    int height = plan.makespan + 2;
+    int height = plan.makespan + 1;
     std::vector<std::vector<bool>> cells(edges.size(),
                                          std::vector<bool>(height, true));
+    std::vector<std::vector<std::vector<bool>>> edge_cells(edges.size(),
+							   std::vector<std::vector<bool>>(height));
+    for(int v = 0; v < edges.size(); v++){
+      for(int t = 0; t < height; t++){
+	edge_cells[v][t] = std::vector<bool>(edges[v].size(), true);
+      }
+    }
     std::vector<int> cur = starts;
     cur.resize(agent_id);
-    for (int t = 0; t < height - 1; t++) {
+    for (int t = 0; t < height; t++) {
       for (int i = 0; i < agent_id; i++) {
-        cells[cur[i]][t] = cells[cur[i]][t + 1] = false;
+        cells[cur[i]][t] = false;
+        if (cur[i] == goal) {
+          goal_time[base_plan_id] = t + 1;
+        }
         if (plan.routes[i].size() <= t) {
           continue;
         }
         int next_cur = edges[cur[i]][plan.routes[i][t]];
-        cells[next_cur][t] = cells[next_cur][t + 1] = false;
+	int rev_edge_id = rev_edge_ids[cur[i]][plan.routes[i][t]];
+	edge_cells[next_cur][t][rev_edge_id] = false;
         cur[i] = next_cur;
-        if (cur[i] == goal) {
-          goal_time[base_plan_id] = t + 3;
-        }
       }
     }
 
     for (int i = agent_id + 1; i < starts.size(); i++) {
+      if (starts[i] == goal) {
+	continue;
+      }
       for (int t = 0; t < height; t++) {
         cells[starts[i]][t] = false;
       }
-      if (starts[i] == goal) {
-        goal_time[base_plan_id] = height;
-      }
     }
+
+    plan_cells[base_plan_id] = cells;
+    plan_edge_cells[base_plan_id] = edge_cells;
 
     auto &dist = dist_to_go[base_plan_id];
     dist = std::vector<std::vector<int>>(edges.size(),
@@ -162,8 +148,9 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
         }
       }
       if (t > 0) {
-        for (auto j : edges[i]) {
-          if (cells[j][t - 1] && dist[j][t - 1] == INF) {
+        for (int e = 0 ; e < edges[i].size(); e++) {
+	  int j = edges[i][e];
+          if (cells[j][t - 1] && edge_cells[j][t-1][rev_edge_ids[i][e]] && dist[j][t - 1] == INF) {
             dist[j][t - 1] = dist[i][t] + 1;
             bfs.push(std::make_pair(j, t - 1));
           }
@@ -203,7 +190,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
 
   int max_height = 0;
   for (auto &plan : plans) {
-    max_height = std::max(max_height, plan.makespan + 2);
+    max_height = std::max(max_height, plan.makespan + 1);
   }
   // std::vector<std::vector<int>> braid_count(coordinates.size(),
   // std::vector<int>(max_height,0));
@@ -231,7 +218,7 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
 
     auto &plan = plans[conf.base_plan_id];
 
-    if (conf.pos == goal && t == plan.makespan + 1) {
+    if (conf.pos == goal && t == plan.makespan) {
       Plan new_plan;
       std::vector<int> route;
       int cur = id;
@@ -256,49 +243,49 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
                      pos = node.pos;
     VirtualBraidPtr braid = get_braid_copy(conf.braid);
     int s = pos[order[noo + agent_id]];
-    // bool collide = false;
     for (int i = 0; i < agent_id; i++) {
-      // occupied.push_back(pos[order[i]]);
       if (plan.routes[i].size() <= t) {
         continue;
       }
       int order_i = order[noo + i], source = pos[order_i];
-      int target = edges[source][plan.routes[i][t]];
+      int target = edge_vertices[source][plan.routes[i][t]];
       reorder(order, rev_order, target, order_i, pos);
       inner_calc_next_braid(braid, order_i, target, pos);
-      // occupied.push_back(target);
-      // if (target == s) {
-      // collide = true;
-      // break;
-      //}
     }
-    // if (collide)
-    // continue;
     braid->post_process();
-    int order_i = order[noo + agent_id];
     for (int edge_id = 0; edge_id < edges[s].size(); edge_id++) {
-      int target = edges[s][edge_id];
-      /*bool collide = false;
-      for (auto v : occupied) {
-        if (v == target) {
-          collide = true;
-          break;
-        }
+      int target = edges[s][edge_id], target_time = std::min(t + 1, plan.makespan);
+      if(!plan_cells[conf.base_plan_id][target][target_time] || !plan_edge_cells[conf.base_plan_id][s][t][edge_id]){
+	continue;
       }
-      if (collide)
-      continue;*/
       Configure new_conf;
       new_conf.pos = target;
-      new_conf.time = std::min(t + 1, plan.makespan + 1);
+      new_conf.time = target_time;
       new_conf.base_plan_id = conf.base_plan_id;
+      
       int h = dist_to_go[new_conf.base_plan_id][new_conf.pos][new_conf.time];
-      if (h ==
-          INF /* || braid_count[target][new_conf.time] >= number_of_plans*/) {
+      if (h == INF) {
         continue;
       }
-      auto next_pos = pos;
+
+      // calculate new braid
       new_conf.braid = get_braid_copy(braid);
-      inner_calc_next_braid(new_conf.braid, order_i, target, next_pos);
+      auto new_order = order;
+      auto new_rev_order = rev_order;
+      auto new_pos = pos;
+      int edge_vertex = edge_vertices[s][edge_id], order_i = new_order[noo + agent_id];
+      reorder(new_order, new_rev_order, edge_vertex, order_i, new_pos);
+      inner_calc_next_braid(new_conf.braid, order_i, edge_vertex, new_pos);
+      for (int i = 0; i <= agent_id; i++) {
+	if (i < agent_id && plan.routes[i].size() <= t) {
+	  continue;
+	}
+	int order_i = new_order[noo + i];
+	int target = edge_vertices_targets[new_pos[order_i]];
+	assert(target!=-1);
+	reorder(new_order, new_rev_order, target, order_i, new_pos);
+	inner_calc_next_braid(new_conf.braid, order_i, target, new_pos);
+      }
       new_conf.braid->post_process();
 
       int new_dist = node_dist + (s == goal && target == goal &&
@@ -312,10 +299,9 @@ PrioritizedPlanning::single_search(const std::vector<Plan> plans,
         new_node.back = id;
         new_node.back_edge = edge_id;
         new_node.open = true;
-        new_node.order = order;
-        new_node.rev_order = rev_order;
-        reorder(new_node.order, new_node.rev_order, target, order_i, pos);
-        new_node.pos = next_pos;
+        new_node.order = new_order;
+        new_node.rev_order = new_rev_order;
+        new_node.pos = new_pos;
         int new_id = nodes.size();
         node_index[new_conf] = new_id;
         nodes.push_back(new_node);
@@ -359,7 +345,7 @@ PrioritizedPlanning::search(const std::string &log_filename,
     plans = single_search(plans, i);
     if (log_file != NULL) {
       int runtime =
-          duration_to_int(std::chrono::system_clock::now() - start_time);
+	duration_to_int(std::chrono::system_clock::now() - start_time);
       fprintf(log_file, "%d %d %d %llu %d %d ", runtime, plans[0].makespan,
               plans[plans.size() - 1].makespan, add_count, count_closed_nodes,
               count_all_nodes);
@@ -403,6 +389,7 @@ void PrioritizedPlanning::read_grid_map(int &n, int &m) {
     }
     fscanf(f, "type octile\nheight %d\nwidth %d\nmap\n", &m, &n);
     map = std::vector<std::vector<bool>>(n, std::vector<bool>(m));
+    assert(n<=1000);
     for (int i = 0; i < m; i++) {
       char s[1000];
       fscanf(f, "%s", s);
@@ -444,13 +431,13 @@ void PrioritizedPlanning::read_grid_map(int &n, int &m) {
       }
     }
   }
-  coordinates = std::vector<AnonymousBhattacharya::Point>(n * m);
+  coordinates = std::vector<AnonymousBhattacharya::Point>(nov);
   for (int x = 0; x < n; x++) {
     for (int y = 0; y < m; y++) {
       int id = ids[m * x + y];
       if (id != -1) {
-        coordinates[id].x = x;
-        coordinates[id].y = y;
+        coordinates[id].x = 2*x;
+        coordinates[id].y = 2*y;
       }
     }
   }
@@ -483,7 +470,7 @@ void PrioritizedPlanning::read_grid_map(int &n, int &m) {
       }
       if (!outer) {
         obpts.push_back(coordinates.size());
-        coordinates.push_back(AnonymousBhattacharya::Point(x, y));
+        coordinates.push_back(AnonymousBhattacharya::Point(2*x, 2*y));
       }
     }
   }
@@ -506,6 +493,26 @@ void PrioritizedPlanning::read_grid_map(int &n, int &m) {
     if (goals[i] == -1) {
       fprintf(stderr, "Invalid goal for agent %d\n", i);
       exit(1);
+    }
+  }
+
+  rev_edge_ids = std::vector<std::vector<int>>(edges.size());
+  edge_vertices = std::vector<std::vector<int>>(edges.size());
+  edge_vertices_targets = std::vector<int>(coordinates.size(), -1);
+  for(int i = 0; i < edges.size(); i++){
+    rev_edge_ids[i] = std::vector<int>(edges[i].size());
+    edge_vertices[i] = std::vector<int>(edges[i].size());
+    for(int e = 0 ; e < edges[i].size(); e++){
+      int j = edges[i][e];
+      for(int ej =0 ; ej < edges[j].size(); ej++){
+	if(edges[j][ej] == i){
+	  rev_edge_ids[i][e] = ej;
+	}
+      }
+      edge_vertices[i][e] = coordinates.size();
+      edge_vertices_targets.push_back(j);
+      coordinates.push_back(Point((coordinates[i].x+coordinates[j].x)/2,
+				  (coordinates[i].y+coordinates[j].y)/2));
     }
   }
 }

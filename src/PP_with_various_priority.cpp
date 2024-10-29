@@ -36,8 +36,8 @@ int main(int argc, char **argv) {
     std::vector<int> curs = search.starts;
     for (int i = 0; i < k; i++) {
       int agent = priority[i];
-      printf("%d %d ", search.coordinates[curs[agent]].x,
-             search.coordinates[curs[agent]].y);
+      printf("%d %d ", search.coordinates[curs[agent]].x/2,
+             search.coordinates[curs[agent]].y/2);
     }
     putchar('\n');
     for (int s = 0; s < makespan; s++) {
@@ -46,8 +46,8 @@ int main(int argc, char **argv) {
         if (routes[agent].size() > s) {
           curs[agent] = search.edges[curs[agent]][routes[agent][s]];
         }
-        printf("%d %d ", search.coordinates[curs[agent]].x,
-               search.coordinates[curs[agent]].y);
+        printf("%d %d ", search.coordinates[curs[agent]].x/2,
+               search.coordinates[curs[agent]].y/2);
       }
       putchar('\n');
     }

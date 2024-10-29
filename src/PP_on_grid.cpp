@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
     printf("%d %d\n", makespan, plan.cost);
     std::vector<int> curs = search.starts;
     for (int i = 0; i < k; i++) {
-      printf("%d %d ", search.coordinates[curs[i]].x,
-             search.coordinates[curs[i]].y);
+      printf("%d %d ", search.coordinates[curs[i]].x/2,
+             search.coordinates[curs[i]].y/2);
     }
     putchar('\n');
     for (int s = 0; s < makespan; s++) {
@@ -40,8 +40,8 @@ int main(int argc, char **argv) {
         if (routes[i].size() > s) {
           curs[i] = search.edges[curs[i]][routes[i][s]];
         }
-        printf("%d %d ", search.coordinates[curs[i]].x,
-               search.coordinates[curs[i]].y);
+        printf("%d %d ", search.coordinates[curs[i]].x/2,
+               search.coordinates[curs[i]].y/2);
       }
       putchar('\n');
     }

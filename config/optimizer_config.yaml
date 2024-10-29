@@ -1,5 +1,5 @@
 number_of_way_points: 100
-agent_radius: 0.5
+agent_radius: 0.3535533905932738
 verbose: false
 
 collision_cost_const: 1000000.

@@ -1,5 +1,6 @@
 #!/bin/bash
 
-for ((i=0;i<$4;i++)); do
-    ../build/PP_on_grid $5 1 < ../build/grid_instances/$1-$2-$3-$i.txt > ../build/PP_results3/$1-$2-$3-$i-$5.txt &
+mkdir -p ../build/$1_PP_results
+for ((i=0;i<$3;i++)); do
+    ../build/PP_on_grid $4 1 < ../build/$1_instances/$2-$i.txt > ../build/$1_PP_results/$2-$i-$4.txt &
 done

@@ -39,7 +39,3 @@ starts= random.sample(pool, n)
 goals = random.sample(pool, n)
 for s,g in zip(starts, goals):
     print(s[0], s[1], g[0], g[1])
-
-#sgs = random.sample(pool, 2*n)
-#for s,g in zip(sgs[:n], sgs[n:]):
-#    print(s[0], s[1], g[0], g[1])

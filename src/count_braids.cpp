@@ -1,9 +1,11 @@
-#include "braid.hpp"
+#include "dynnikov.hpp"
 #include <set>
+
 int main(int argc, char **argv) {
   int width, height, number_of_agents, number_of_plans;
   scanf("%d%d%d%d", &width, &height, &number_of_agents, &number_of_plans);
-  std::set<Braid> braids;
+  int number_of_obstacles = std::stoi(argv[1]);
+  std::set<Dynnikov> braids;
   for (int T = 0; T < number_of_plans; T++) {
     int makespan;
     scanf("%d", &makespan);
@@ -17,17 +19,10 @@ int main(int argc, char **argv) {
       }
     }
 
-    int l;
-    scanf("%d", &l);
-    Braid b;
-    b.N = number_of_agents;
-    for (int t = 0; t < l; t++) {
-      int i;
-      char s[2];
-      scanf("%d %s", &i, s);
-      b.add(i, s[0] == '+');
+    Dynnikov b(number_of_agents + number_of_obstacles);
+    for (int t = 0; t < 2*b.N - 2; t++) {
+      gmp_scanf("%Zd", &(b.cd[t]));
     }
-    b.reduce_fully();
     braids.insert(b);
   }
   printf("%d\n", (int)braids.size());

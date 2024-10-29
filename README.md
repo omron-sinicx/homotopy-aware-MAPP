@@ -5,7 +5,7 @@ This is a repository for [the following paper](https://arxiv.org/abs/2310.01945)
 
 ## Required Library
 
-- [yamp-cpp](https://github.com/jbeder/yaml-cpp) 0.6.0
+- [yamp-cpp](https://github.com/jbeder/yaml-cpp) 0.8.0
 - [Eigen3](https://eigen.tuxfamily.org/index.php) 3.3
 - [g2o](https://github.com/RainerKuemmerle/g2o) 1.0.0
 - [gmp](https://gmplib.org/) 6.1.2
@@ -26,38 +26,41 @@ The following commands are to be run on the build folder.
 ```
 where `H` is the number of required solutions.
 
+`sample` folder contains samples of input files.
+
 ## Experiments
+
+The scripts for experiments are stored in `scripts` folder
+The scripts to show graphs are also contained in `scripts` folder.
+All scripts must be run in the build folder.
 
 ### Evaluation of Runtime
 
 #### Generate instances
 ```
-mkdir grid_instances
-bash ../script/generate_grid_instances.sh 29 29 40 10
+bash ../script/generate_map_instances.sh empty-48-48 500 10
+bash ../script/generate_map_instances.sh den312d 500 10
+bash ../script/generate_map_instances.sh random-64-64-10 500 10
 ```
 
 #### Solve
 ```
-mkdir logs
-bash ../script/record_logs.sh 29 29 40 10 100
+bash ../script/record_logs_map.sh empty-48-48 500 10 100
+bash ../script/record_logs_map.sh den312d 500 10 100
+bash ../script/record_logs_map.sh random-64-64-10 500 10 100
 ```
 
 #### Plot results
 
 ```
-python3 ../script/show_runtimes.py
+python3 ../script/show_runtimes_map.py
 python3 ../script/show_maxcd.py
 ```
 
 ### Plot coordinates for random braids
 
 ```
-mkdir cd_values
-./dynnikov_count 3 30 100 100 > cd_values/3.txt
-./dynnikov_count 5 50 100 100 > cd_values/5.txt
-./dynnikov_count 10 100 100 100 > cd_values/10.txt
-./dynnikov_count 100 1000 100 100 > cd_values/100.txt
-./dynnikov_count 1000 10000 100 100 > cd_values/1000.txt
+bash ../script/run_cd_values.sh
 python3 ../script/show_cd_values.py
 ```
 
@@ -65,41 +68,43 @@ python3 ../script/show_cd_values.py
 
 #### Generate instances
 ```
-bash ../script/generate_grid_instances.sh 14 14 10 100
+bash ../script/generate_map_instances_2.sh empty-14-14 10 100
+bash ../script/generate_map_instances_2.sh obstacle-14-14 10 100
 ```
 
 #### Solve
 
 ```
-mkdir PP_results
-bash ../script/solve_by_PP.sh 14 14 10 100 100
-mkdir PPvP_results
-bash ../script/solve_by_PPvP.sh 14 14 10 100 100
+bash ../script/solve_by_PP.sh empty-14-14 10 100 100
+bash ../script/solve_by_PPvP.sh empty-14-14 10 100 100
+bash ../script/solve_by_PP.sh obstacle-14-14 10 100 100
+bash ../script/solve_by_PPvP.sh obstacle-14-14 10 100 100
 ```
 
 Although this repository does not contain any optimal MAPF solver for the Optimal One baseline,
-results of such a solver must be stored in a folder named `CBS_results` for the following steps.
+results of such a solver must be stored in folders named `empty-14-14_ICBS_results` and `obstacle-14-14_ICBS_results` for the following steps.
 
 #### Optimization
 
 ```
-mkdir PP_opt_results
-mkdir PPvP_opt_results
-mkdir CBS_opt_results
-bash ../script/optimize_PP_and_CBS.sh 14 14 10 100 100
+bash ../script/optimize_PP_and_CBS.sh empty-14-14 10 100 100
+bash ../script/optimize_PP_and_CBS.sh obstacle-14-14 10 100 100
 ```
 
 #### Plot results
 
 ```
 python3 ../script/show_results.py
+python3 ../script/show_winning_rate.py
 ```
 
 #### Show histogram
 ```
-python3 ../script/count_braids.py > braid_counts.txt
+python3 ../script/count_braids.py empty-14-14 0 > count_empty-14-14.txt
+python3 ../script/count_braids.py obstacle-14-14 5 > count_obstacle-14-14.txt
 python3 ../script/show_histogram.py
 ```
+
 ## License
 This software is released under the MIT License, see [LICENSE](LICENSE).
 

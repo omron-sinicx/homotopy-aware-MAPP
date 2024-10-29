@@ -17,8 +17,8 @@ public:
     VirtualBraidPtr braid;
   };
 
-  std::vector<std::vector<int>> edges;
-  std::vector<int> starts, goals, obpts;
+  std::vector<std::vector<int>> edges, rev_edge_ids, edge_vertices;
+  std::vector<int> starts, goals, obpts, edge_vertices_targets;
   int want;
   int count_closed_nodes = 0, count_all_nodes = 0;
 
